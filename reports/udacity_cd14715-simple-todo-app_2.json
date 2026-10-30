@@ -1,0 +1,320 @@
+{
+  "pullRequest": {
+    "owner": "udacity",
+    "repo": "cd14715-simple-todo-app",
+    "number": 2
+  },
+  "fileReviews": [
+    {
+      "file": "src/todo.ts",
+      "codeQuality": {
+        "file": "src/todo.ts",
+        "issues": [
+          {
+            "line": 120,
+            "severity": "critical",
+            "category": "security",
+            "description": "SQL Injection in searchTodos() via template literal string interpolation",
+            "suggestion": "Use parameterized queries: const query = 'SELECT * FROM todos WHERE title LIKE $1 OR description LIKE $1'; await db.query(query, [`%${keyword}%`]);"
+          },
+          {
+            "line": 129,
+            "severity": "critical",
+            "category": "security",
+            "description": "SQL Injection in searchTodosByStatus() via string concatenation",
+            "suggestion": "Use parameterized queries with proper type handling: const query = 'SELECT * FROM todos WHERE completed = $1'; await db.query(query, [isCompleted]);"
+          },
+          {
+            "line": 138,
+            "severity": "critical",
+            "category": "security",
+            "description": "SQL Injection in getTodosByUser() via template literal",
+            "suggestion": "Use parameterized queries: const query = 'SELECT * FROM todos WHERE user_id = $1'; await db.query(query, [userId]);"
+          },
+          {
+            "line": 119,
+            "severity": "high",
+            "category": "bug-risk",
+            "description": "No input validation for keyword despite validateTodoInput() utility in codebase",
+            "suggestion": "Add validation: if (!keyword || keyword.length > 255) throw new Error();"
+          },
+          {
+            "line": 129,
+            "severity": "high",
+            "category": "bug-risk",
+            "description": "Type safety violation: string parameter used as boolean in SQL",
+            "suggestion": "Change signature to boolean type: export async function searchTodosByStatus(completed: boolean)"
+          },
+          {
+            "line": 120,
+            "severity": "high",
+            "category": "best-practice",
+            "description": "Missing error handling for db.query() call",
+            "suggestion": "Add try-catch with proper error logging and custom error types"
+          },
+          {
+            "line": 129,
+            "severity": "high",
+            "category": "best-practice",
+            "description": "Missing error handling for db.query() call",
+            "suggestion": "Implement error handling with DatabaseError class"
+          },
+          {
+            "line": 138,
+            "severity": "high",
+            "category": "best-practice",
+            "description": "Missing error handling for db.query() call",
+            "suggestion": "Add try-catch with context-aware error handling"
+          },
+          {
+            "line": 120,
+            "severity": "medium",
+            "category": "performance",
+            "description": "LIKE with leading wildcard prevents index usage",
+            "suggestion": "Add database indexes on title/description; consider full-text search"
+          },
+          {
+            "line": 119,
+            "severity": "medium",
+            "category": "performance",
+            "description": "No pagination support for unlimited result sets",
+            "suggestion": "Add pagination parameters (limit, offset) to function"
+          }
+        ],
+        "overallScore": 15,
+        "summary": "Critical security vulnerabilities identified. All three new search functions use string concatenation for SQL queries instead of parameterized queries, creating SQL injection vulnerabilities. No input validation despite existing utilities. No error handling. Code violates established project patterns."
+      },
+      "testCoverage": {
+        "file": "src/todo.ts",
+        "hasTests": false,
+        "testFiles": [],
+        "untestedPaths": [
+          {
+            "type": "function",
+            "location": "searchTodos",
+            "priority": "critical",
+            "reasoning": "Function interpolates user input without parameterization. Needs SQL injection testing.",
+            "suggestedTest": "it('should prevent SQL injection', () => { const r = searchTodos(\"' OR '1'='1\"); expect(r).toEqual([]); });"
+          },
+          {
+            "type": "function",
+            "location": "searchTodosByStatus",
+            "priority": "critical",
+            "reasoning": "String parameter enables type confusion. No validation tests.",
+            "suggestedTest": "it('should handle invalid status', () => { expect(() => searchTodosByStatus('yes')).toThrow(); });"
+          },
+          {
+            "type": "function",
+            "location": "getTodosByUser",
+            "priority": "critical",
+            "reasoning": "Multi-tenant function lacks data isolation verification.",
+            "suggestedTest": "it('User A cannot access User B todos', () => { expect(getTodosByUser('B').every(t => t.userId === 'B')).toBe(true); });"
+          },
+          {
+            "type": "edge-case",
+            "location": "All functions",
+            "priority": "high",
+            "reasoning": "No null/undefined validation tests",
+            "suggestedTest": "it('should throw for null input', () => { expect(() => searchTodos(null)).toThrow(); });"
+          },
+          {
+            "type": "edge-case",
+            "location": "searchTodos",
+            "priority": "high",
+            "reasoning": "No LIKE wildcard character tests",
+            "suggestedTest": "it('should treat % as literal', () => { expect(searchTodos('50%').every(t => t.title.includes('50%'))).toBe(true); });"
+          },
+          {
+            "type": "edge-case",
+            "location": "All functions",
+            "priority": "high",
+            "reasoning": "No large result set tests",
+            "suggestedTest": "it('should handle large results efficiently', () => { expect(searchTodos('a').length).toBeLessThanOrEqual(1000); });"
+          }
+        ],
+        "coverageEstimate": 0,
+        "summary": "Zero test coverage. Critical security vulnerabilities remain untested. Minimum 30 tests required for SQL injection, data isolation, and edge cases."
+      },
+      "refactorings": {
+        "file": "src/todo.ts",
+        "suggestions": [
+          {
+            "type": "pattern-improvement",
+            "location": "lines 119-139",
+            "impact": "high",
+            "description": "Replace string concatenation with parameterized queries",
+            "before": "const query = `SELECT * FROM todos WHERE title LIKE '%${keyword}%'`;",
+            "after": "const query = 'SELECT * FROM todos WHERE title LIKE $1'; await db.query(query, [`%${keyword}%`]);",
+            "benefits": "Eliminates SQL injection, follows codebase patterns, protects database"
+          },
+          {
+            "type": "rename",
+            "location": "line 127",
+            "impact": "high",
+            "description": "Change parameter type from string to boolean",
+            "before": "export async function searchTodosByStatus(completed: string)",
+            "after": "export async function searchTodosByStatus(completed: boolean)",
+            "benefits": "Prevents type confusion, enables TypeScript checking, clarifies API"
+          },
+          {
+            "type": "simplify",
+            "location": "lines 119-139",
+            "impact": "medium",
+            "description": "Extract common query execution logic",
+            "before": "const rows = await db.query(query); return rows as Todo[];",
+            "after": "return executeTodoQuery(sql, params);",
+            "benefits": "Reduces duplication, centralizes error handling, improves maintainability"
+          },
+          {
+            "type": "pattern-improvement",
+            "location": "lines 119-139",
+            "impact": "high",
+            "description": "Add input validation using existing utilities",
+            "before": "export async function searchTodos(keyword: string): Promise<Todo[]> {",
+            "after": "validateTodoInput({keyword}); const sanitized = sanitizeInput(keyword);",
+            "benefits": "Uses existing patterns, prevents empty/null attacks, enforces size limits"
+          },
+          {
+            "type": "extract-function",
+            "location": "line 120",
+            "impact": "high",
+            "description": "Add pagination support to prevent memory exhaustion",
+            "before": "export async function searchTodos(keyword: string): Promise<Todo[]>",
+            "after": "export async function searchTodos(keyword: string, options?: {limit?: number; offset?: number}): Promise<SearchResult<Todo>>",
+            "benefits": "Prevents OOM errors, improves scalability, enables UI pagination"
+          },
+          {
+            "type": "modernize",
+            "location": "lines 119-139",
+            "impact": "medium",
+            "description": "Replace type assertions with Zod schema validation",
+            "before": "return rows as Todo[];",
+            "after": "return TodoSchema.array().parse(rows);",
+            "benefits": "Runtime type safety, catches malformed data, prevents corruption"
+          }
+        ],
+        "summary": "Six refactoring opportunities: parameterized queries, type safety, error handling, validation, pagination, and code duplication reduction."
+      }
+    },
+    {
+      "file": "src/todo.ts",
+      "codeQuality": {
+        "file": "src/todo.ts",
+        "issues": [],
+        "overallScore": 15,
+        "summary": "Critical security vulnerabilities. All three search functions use string concatenation in SQL queries creating injection risks. No validation, no error handling."
+      },
+      "testCoverage": {
+        "file": "src/todo.ts",
+        "hasTests": false,
+        "testFiles": [],
+        "untestedPaths": [],
+        "coverageEstimate": 0,
+        "summary": "Zero coverage for all new functions."
+      },
+      "refactorings": {
+        "file": "src/todo.ts",
+        "suggestions": [],
+        "summary": "Multiple opportunities for improvement."
+      }
+    }
+  ],
+  "summary": {
+    "totalFiles": 1,
+    "overallScore": 15,
+    "criticalIssues": 3,
+    "highPriorityTests": 8,
+    "refactoringOpportunities": 6
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "category": "Security",
+      "description": "All three search functions contain SQL injection vulnerabilities through string interpolation. Must use parameterized queries before merge.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "critical",
+      "category": "Type Safety",
+      "description": "searchTodosByStatus() accepts string instead of boolean, enabling type confusion attacks. Change parameter type.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "critical",
+      "category": "Testing",
+      "description": "Zero test coverage for new functions. Minimum 30 tests required covering SQL injection, data isolation, and edge cases.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Input Validation",
+      "description": "Functions lack input validation despite existing utilities. Add null checks, length limits, and format validation.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Error Handling",
+      "description": "No error handling around database queries. Implement try-catch with logging and custom error types.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "high",
+      "category": "Data Isolation",
+      "description": "getTodosByUser() needs verification of multi-tenant data isolation. Add tests preventing cross-user access.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Performance",
+      "description": "LIKE queries lack indexes. No pagination causes memory exhaustion. Add pagination support.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Quality",
+      "description": "Remove vulnerability markers from comments. Replace with secure implementation documentation.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "medium",
+      "category": "Code Duplication",
+      "description": "Extract common query execution pattern into reusable helper function.",
+      "files": [
+        "src/todo.ts"
+      ]
+    },
+    {
+      "priority": "low",
+      "category": "Type Safety",
+      "description": "Replace type assertions with Zod schema validation for runtime safety.",
+      "files": [
+        "src/todo.ts"
+      ]
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-10-30T00:00:00Z",
+    "duration": 45000,
+    "agentVersions": {
+      "code-quality-analyzer": "1.0.0",
+      "test-coverage-analyzer": "1.0.0",
+      "refactoring-suggester": "1.0.0"
+    }
+  }
+}
