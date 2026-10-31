@@ -1,17 +1,14 @@
 import { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { REFACTORING_SUGGESTER_PROMPT } from '../prompts/refactoring-suggester.prompt.js';
 
 export const refactoringSuggester: AgentDefinition = {
   description:
-    'Identifies opportunities to modernize code patterns, apply design patterns, eliminate dead code, and improve architectural clarity.',
+    'Identifies refactoring opportunities in pull request changes: extract-function candidates, dead code, duplication, design-pattern improvements and modern language features, with before/after code.',
   model: 'inherit',
   tools: {
     grep: true,
     view: true,
+    Skill: true, // lets the agent invoke skills from .claude/skills/
   },
-  prompt: `You are a Refactoring Suggester agent. Your job is to analyze code changes for architectural improvements and code modernization.
-  
-  Focus on:
-  1. Identifying code duplication, dead logic, or overly complex functions that need extraction.
-  2. Suggesting modern language features and clean design patterns.
-  3. Providing clear before/after examples for your refactoring recommendations.`,
+  prompt: REFACTORING_SUGGESTER_PROMPT,
 };
