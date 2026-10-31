@@ -2,6 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CodeReviewOrchestrator } from './orchestrator.js';
 import { ReportGenerator, logger, withRetry, withTimeout, withRateLimit } from './utils/index.js';
+
+const REVIEW_TIMEOUT_MS = 15 * 60 * 1000;
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -13,10 +16,19 @@ async function main(): Promise<void> {
   }
 
   const [owner, repo, prNumberStr] = args;
-  const prNumber = parseInt(prNumberStr, 10);
 
-  if (Number.isNaN(prNumber) || prNumber <= 0) {
-    logger.error(`Invalid pull request number: "${prNumberStr}". It must be a positive integer.`);
+  // The PR number must be made only of digits (rejects "12abc", "1.5", "-3")
+  if (!/^\d+$/.test(prNumberStr)) {
+    logger.error(`Invalid pull request number: "${prNumberStr}".`);
+    logger.error('The PR number must be a positive integer, for example: 1');
+    logger.error('Usage: npm run dev -- <owner> <repo> <prNumber>');
+    process.exit(1);
+  }
+
+  const prNumber = Number(prNumberStr);
+  if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+    logger.error(`Invalid pull request number: "${prNumberStr}".`);
+    logger.error('Use a safe positive integer, for example: 42');
     process.exit(1);
   }
 
@@ -45,22 +57,31 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // 4. Validate the GitHub token used by the GitHub MCP server
+  if (!process.env.GITHUB_TOKEN) {
+    logger.error('GITHUB_TOKEN is not set. Add a GitHub token to your .env file.');
+    logger.error('Example: GITHUB_TOKEN=ghp_your_token_here');
+    logger.error('Required so the GitHub MCP server can fetch pull request data.');
+    process.exit(1);
+  }
+  logger.info('GitHub authentication: using GITHUB_TOKEN for MCP access');
+
   logger.info(`Starting review for ${owner}/${repo} PR #${prNumber}...`);
 
   try {
-    // 4. Run the review
+    // 5. Run the review with rate limiting, retry and a timeout
     const orchestrator = new CodeReviewOrchestrator();
     const report = await withRateLimit(
-  () =>
-    withRetry(
-      () => withTimeout(() => orchestrator.reviewPullRequest(owner, repo, prNumber), 15 * 60 * 1000),
-      2,    // retries
-      2000  // base delay in ms
-    ),
-  20000   // estimated tokens
-);
+      () =>
+        withRetry(
+          () => withTimeout(() => orchestrator.reviewPullRequest(owner, repo, prNumber), REVIEW_TIMEOUT_MS),
+          2,    // retries
+          2000  // base delay in ms
+        ),
+      20000   // estimated tokens
+    );
 
-    // 5. Generate and save all three report formats
+    // 6. Generate and save all three report formats
     const generator = new ReportGenerator();
     const reportsDir = path.resolve(process.env.PROJECT_ROOT || process.cwd(), 'reports');
     fs.mkdirSync(reportsDir, { recursive: true });
